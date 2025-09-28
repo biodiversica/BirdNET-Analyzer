@@ -31,6 +31,7 @@ dependencies = [
     "pandas",
     "matplotlib",
     "kagglehub",
+    "soundcard",
 ]
 
 [project.optional-dependencies]

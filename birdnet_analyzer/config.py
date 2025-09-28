@@ -247,6 +247,14 @@ SAMPLE_RATE: int | None = None
 SIG_LENGTH: float | None = None
 
 ######################
+# Real-time settings #
+######################
+REAL_TIME: bool = False
+LOOPBACK: bool = False
+NON_STOP: bool = False
+INPUT_DEVICE: str | None = None
+
+######################
 # Get and set config #
 ######################
 

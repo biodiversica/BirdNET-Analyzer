@@ -1,7 +1,6 @@
 import os
 from typing import Literal
 
-
 def analyze(
     audio_input: str,
     output: str | None = None,
@@ -28,6 +27,10 @@ def analyze(
     locale: str = "en",
     additional_columns: list[str] | None = None,
     use_perch: bool = False,
+    real_time: bool = False,
+    loopback: bool = False,
+    non_stop: bool = True,
+    input_device: str | None = None,
 ):
     """
     Analyzes audio files for bird species detection using the BirdNET-Analyzer.
@@ -57,6 +60,10 @@ def analyze(
         locale (str, optional): Locale for species names and output. Defaults to "en".
         additional_columns (list[str] | None, optional): Additional columns to include in the output. Defaults to None.
         use_perch (bool, optional): Whether to use the Perch model for analysis. Defaults to False.
+        real_time (bool, optional): Whether to use real-time audio analysis from soundcard input. Defaults to False.
+        loopback (bool, optional): Whether to use real-time audio analysis from speaker loopback as input (real_time must be True). Defaults to False.
+        non_stop (bool, optional): Whether to use the Perch model for analysis. Defaults to False.
+        input_device (str, optional): Input device used in real-time audio analysis. Defaults to None (default input sound device which is set in your operating system).
     Returns:
         None
     Raises:
@@ -98,35 +105,52 @@ def analyze(
         labels_file=cfg.LABELS_FILE,
         additional_columns=additional_columns,
         use_perch=use_perch,
+        real_time=real_time,
+        loopback=loopback,
+        non_stop=non_stop,
+        input_device=input_device,
     )
 
-    print(f"Found {len(cfg.FILE_LIST)} files to analyze")
+    if real_time:
+        from birdnet_analyzer.analyze.utils import run_real_time_analysis
 
-    if not cfg.SPECIES_LIST:
-        print(f"Species list contains {len(cfg.LABELS)} species")
+        print("Running BirdNET-Analyzer in real-time mode...")
+
+        if not cfg.SPECIES_LIST:
+            print(f"Species list contains {len(cfg.LABELS)} species")
+        else:
+            print(f"Species list contains {len(cfg.SPECIES_LIST)} species")
+
+        run_real_time_analysis(flist[0])        
+
     else:
-        print(f"Species list contains {len(cfg.SPECIES_LIST)} species")
+        print(f"Found {len(cfg.FILE_LIST)} files to analyze")
 
-    result_files = []
+        if not cfg.SPECIES_LIST:
+            print(f"Species list contains {len(cfg.LABELS)} species")
+        else:
+            print(f"Species list contains {len(cfg.SPECIES_LIST)} species")
 
-    # Analyze files
-    if cfg.CPU_THREADS < 2 or len(flist) < 2:
-        result_files.extend(analyze_file(f) for f in flist)
-    else:
-        with Pool(cfg.CPU_THREADS) as p:
-            # Map analyzeFile function to each entry in flist
-            results = p.map_async(analyze_file, flist)
-            # Wait for all tasks to complete
-            results.wait()
-            result_files = results.get()
+        result_files = []
 
-    # Combine results?
-    if cfg.COMBINE_RESULTS:
-        print(f"Combining results, writing to {cfg.OUTPUT_PATH}...", end="", flush=True)
-        combine(result_files)
-        print("done!", flush=True)
+        # Analyze files
+        if cfg.CPU_THREADS < 2 or len(flist) < 2:
+            result_files.extend(analyze_file(f) for f in flist)
+        else:
+            with Pool(cfg.CPU_THREADS) as p:
+                # Map analyzeFile function to each entry in flist
+                results = p.map_async(analyze_file, flist)
+                # Wait for all tasks to complete
+                results.wait()
+                result_files = results.get()
 
-    save_analysis_params(os.path.join(cfg.OUTPUT_PATH, cfg.ANALYSIS_PARAMS_FILENAME))
+        # Combine results?
+        if cfg.COMBINE_RESULTS:
+            print(f"Combining results, writing to {cfg.OUTPUT_PATH}...", end="", flush=True)
+            combine(result_files)
+            print("done!", flush=True)
+
+        save_analysis_params(os.path.join(cfg.OUTPUT_PATH, cfg.ANALYSIS_PARAMS_FILENAME))
 
 
 def _set_params(
@@ -155,6 +179,10 @@ def _set_params(
     labels_file=None,
     additional_columns=None,
     use_perch=False,
+    real_time=False,
+    loopback=False,
+    non_stop=False,
+    input_device=None,
 ):
     import birdnet_analyzer.config as cfg
     from birdnet_analyzer.analyze.utils import load_codes
@@ -201,6 +229,12 @@ def _set_params(
     cfg.BATCH_SIZE = bs
     cfg.ADDITIONAL_COLUMNS = additional_columns
     cfg.USE_PERCH = use_perch
+
+    # real-time config
+    cfg.REAL_TIME = real_time
+    cfg.LOOPBACK = loopback
+    cfg.NON_STOP = non_stop
+    cfg.INPUT_DEVICE = input_device
 
     if cfg.USE_PERCH and custom_classifier:
         raise ValueError("Selected custom classifier and Perch model, please select only one.")
@@ -297,3 +331,5 @@ def _set_params(
         cfg.TRANSLATED_LABELS = cfg.LABELS
 
     return [(f, cfg.get_config()) for f in cfg.FILE_LIST]
+
+

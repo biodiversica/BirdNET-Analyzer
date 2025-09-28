@@ -400,6 +400,12 @@ def analyzer_parser():
 
     parser.add_argument("--use_perch", action="store_true", help="Use the Perch model for detection.")
 
+    # real-time parser
+    parser.add_argument("--real_time", action="store_true", help="Whether to use real-time audio analysis from soundcard input.")
+    parser.add_argument("--loopback", action="store_true", help="Whether to use real-time audio analysis from speaker loopback as input device (real_time must be True)")
+    parser.add_argument("--non_stop", action="store_true", help="Whether to keep real-time audio analysis active and waiting when input device signal is off.")
+    parser.add_argument("--input_device", default=None, help="Input device used in real-time audio analysis. Default input sound device which is set in your operating system.")
+
     return parser
 
 

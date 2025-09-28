@@ -16,7 +16,6 @@ KALEIDOSCOPE_HEADER = "INDIR,FOLDER,IN FILE,OFFSET,DURATION,scientific_name,comm
 CSV_HEADER = "Start (s),End (s),Scientific name,Common name,Confidence,File\n"
 SCRIPT_DIR = os.path.abspath(os.path.dirname(__file__))
 
-
 def save_analysis_params(path):
     utils.save_params(
         path,
@@ -779,3 +778,148 @@ def analyze_file(item) -> dict[str, str] | None:
     print(f"Finished {fpath} in {delta_time:.2f} seconds", flush=True)
 
     return result_file_names
+
+# real-time analysis
+
+def adjust_to_column_width(table_item, column_width):
+    new_item = table_item
+    while len(new_item) < column_width:
+        new_item = new_item + " "
+    return new_item
+
+def create_table_line(table_width, line_type):
+    new_line = ""
+    while len(new_line) < table_width:
+        new_line = new_line + line_type
+    return new_line
+
+def run_real_time_analysis(item):
+    """
+    Analyzes real-time audio from input device in chunks of 3 seconds.
+
+    Args:
+        item (tuple): A tuple containing the file path (str) and configuration settings.
+
+    """
+    # import soundcard lib to handle input device signal
+    import soundcard as sc
+
+    # get only configuration settings
+    cfg.set_config(item[1])
+
+    table_width = 100
+    column_width = 25
+
+    date_time = False
+    running_flag = True
+    buffer_size = 1024
+    while running_flag:
+        # Init start-end time
+        # start_time = datetime.datetime.now()
+        start, end = 0, cfg.SIG_LENGTH
+        results = {}
+        
+        # Set microphone ID
+        if cfg.LOOPBACK:
+            mic_id = str(sc.default_speaker().name)
+        else:
+            if cfg.INPUT_DEVICE:
+                mic_id = cfg.INPUT_DEVICE
+            else:
+                mic_id = str(sc.default_microphone().name)
+
+        is_playing = False
+        with sc.get_microphone(id=mic_id, include_loopback=cfg.LOOPBACK).recorder(samplerate=cfg.SAMPLE_RATE,channels=[-1,0,1]) as mic:
+            # Check if there is signal through the microphone
+            while not is_playing:
+                # Record an initial audio buffer and check if all samples are not zero
+                tmp_data = mic.record(numframes=buffer_size)
+                if np.mean(tmp_data[:,0]) != 0:
+                    is_playing = True
+                    if cfg.LOOPBACK:
+                        print('\n\nStarting loopback analysis since there is signal coming from input device...')
+                    
+                    # Print table header on terminal
+                    print(create_table_line(table_width,'='))
+                    print(adjust_to_column_width('Timestamp',column_width) + ' | ' + 
+                          adjust_to_column_width('Scientific',column_width) + ' | ' + 
+                          adjust_to_column_width('Common',column_width) + ' | ' +
+                          adjust_to_column_width('Confidence',column_width)
+                          )
+                    print(create_table_line(table_width,'='))
+
+            # Start recording and analyzing chunks of audio
+            while is_playing:
+                # Record data from stereo channels ([stereo mix, left, right]) during 3s (BirdNET default length)
+                data = mic.record(numframes=int(cfg.SAMPLE_RATE*cfg.SIG_LENGTH)) 
+                
+                # only get stereo mix result from recorded signal (first channel, index -1)
+                chunk = data[:,0]
+
+                # Check if loopback has not stop yet
+                if np.mean(chunk) != 0:
+                    # Check if filter must be applied
+                    if cfg.BANDPASS_FMIN is not None and cfg.BANDPASS_FMAX is not None:
+                        chunk = audio.bandpass(chunk, cfg.SAMPLE_RATE, cfg.BANDPASS_FMIN, cfg.BANDPASS_FMAX)
+            
+                    # Advance start and end
+                    start += cfg.SIG_LENGTH - cfg.SIG_OVERLAP
+                    end = start + cfg.SIG_LENGTH
+
+                    # Predict
+                    p = predict([chunk])
+                    
+                    # Add to results
+                    for i in range(len([chunk])):
+                        # Get prediction
+                        pred = p[i]
+
+                        # Assign scores to labels
+                        p_labels = zip(cfg.LABELS, pred, strict=True)
+
+                        # Sort by score
+                        p_sorted = sorted(p_labels, key=operator.itemgetter(1), reverse=True)
+
+                        # Store top 5 results and advance indices
+                        results[f"{start}-{end}"] = p_sorted
+                        
+                    # Get best species label                
+                    species_label = results[f"{start}-{end}"][0][0]
+                    
+                    # Get best confidence result
+                    cfd = results[f"{start}-{end}"][0][1]
+                    
+                    # Translate to locale
+                    lbl = cfg.TRANSLATED_LABELS[cfg.LABELS.index(species_label)]
+                    
+                    # Get scientific and common names
+                    sci_name = lbl.split('_', 1)[0]
+                    com_name = lbl.split('_', 1)[-1]
+                    
+                    # Print result if confidence is above minimum and if species is within location range
+                    if cfd > cfg.MIN_CONFIDENCE and (not cfg.SPECIES_LIST or species_label in cfg.SPECIES_LIST):
+                        # Get current date-time
+                        tmpDate = datetime.datetime.now()
+                        
+                        # Print results as a table line on terminal
+                        if date_time:
+                            print(adjust_to_column_width(str(tmpDate.strftime("%Y-%m-%d %H:%M:%S")),column_width) + " | " + 
+                                  adjust_to_column_width(sci_name, column_width) + " | " + 
+                                  adjust_to_column_width(com_name, column_width) + " | " + str(cfd)
+                                  )
+                        else:
+                            print(adjust_to_column_width(f"{start}-{end}", column_width) + " | " + 
+                                  adjust_to_column_width(sci_name, column_width) + " | " + 
+                                  adjust_to_column_width(com_name, column_width) + " | " + str(cfd)
+                                  )
+                        print(create_table_line(table_width,'-'))
+                        
+                else:
+                    is_playing = False
+                    if cfg.LOOPBACK:
+                        print('End of loopback analysis since there is no signal coming from input device...\n')
+
+        if not cfg.NON_STOP:
+            running_flag = False
+    
+    return 0
