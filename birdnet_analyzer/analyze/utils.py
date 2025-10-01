@@ -807,12 +807,22 @@ def run_real_time_analysis(item):
     # get only configuration settings
     cfg.set_config(item[1])
 
+    # check if real-time log live is empty and write header
+    LIVELOG_HEADER = "Date Time,Scientific name,Common name,Confidence\n"
+    if os.path.getsize(cfg.LIVE_LOG_FILE) == 0:
+        with open(cfg.LIVE_LOG_FILE, "a") as livelog:
+            livelog.write(LIVELOG_HEADER)
+
+    # table size of printed results
     table_width = 100
     column_width = 25
 
+    # maybe future args...
     date_time = False
     running_flag = True
     buffer_size = 1024
+
+    # main rec/analyze audio loop
     while running_flag:
         # Init start-end time
         # start_time = datetime.datetime.now()
@@ -829,15 +839,16 @@ def run_real_time_analysis(item):
                 mic_id = str(sc.default_microphone().name)
 
         is_playing = False
+        # TODO: set channel configuration for different operating system
         with sc.get_microphone(id=mic_id, include_loopback=cfg.LOOPBACK).recorder(samplerate=cfg.SAMPLE_RATE,channels=[-1,0,1]) as mic:
-            # Check if there is signal through the microphone
+            # Check if there is signal through the input device
             while not is_playing:
                 # Record an initial audio buffer and check if all samples are not zero
                 tmp_data = mic.record(numframes=buffer_size)
                 if np.mean(tmp_data[:,0]) != 0:
                     is_playing = True
                     if cfg.LOOPBACK:
-                        print('\n\nStarting loopback analysis since there is signal coming from input device...')
+                        print('\n\nStarting live analysis since there is signal coming from loopback...')
                     
                     # Print table header on terminal
                     print(create_table_line(table_width,'='))
@@ -850,10 +861,11 @@ def run_real_time_analysis(item):
 
             # Start recording and analyzing chunks of audio
             while is_playing:
-                # Record data from stereo channels ([stereo mix, left, right]) during 3s (BirdNET default length)
+                # Record data from input channel 
                 data = mic.record(numframes=int(cfg.SAMPLE_RATE*cfg.SIG_LENGTH)) 
                 
-                # only get stereo mix result from recorded signal (first channel, index -1)
+                # TODO: check channel mix implementation in different operating systems
+                # only get stereo mix result from recorded signal (linux -> first index [stereo mix, left, right])
                 chunk = data[:,0]
 
                 # Check if loopback has not stop yet
@@ -899,11 +911,11 @@ def run_real_time_analysis(item):
                     # Print result if confidence is above minimum and if species is within location range
                     if cfd > cfg.MIN_CONFIDENCE and (not cfg.SPECIES_LIST or species_label in cfg.SPECIES_LIST):
                         # Get current date-time
-                        tmpDate = datetime.datetime.now()
+                        tmp_date = datetime.datetime.now()
                         
                         # Print results as a table line on terminal
                         if date_time:
-                            print(adjust_to_column_width(str(tmpDate.strftime("%Y-%m-%d %H:%M:%S")),column_width) + " | " + 
+                            print(adjust_to_column_width(str(tmp_date.strftime("%Y-%m-%d %H:%M:%S")),column_width) + " | " + 
                                   adjust_to_column_width(sci_name, column_width) + " | " + 
                                   adjust_to_column_width(com_name, column_width) + " | " + str(cfd)
                                   )
@@ -913,13 +925,23 @@ def run_real_time_analysis(item):
                                   adjust_to_column_width(com_name, column_width) + " | " + str(cfd)
                                   )
                         print(create_table_line(table_width,'-'))
+
+                        with open(cfg.LIVE_LOG_FILE, "a") as livelog:
+                            livelog.write(f'{tmp_date.strftime("%Y-%m-%d %H:%M:%S")},{sci_name},{com_name},{cfd}\n')
+
+                    # check if user stopped live audio analysis when using the GUI
+                    tmp_cfg = cfg.get_config()
+                    if tmp_cfg['LIVE_STOP_FLAG']:
+                        print('Live audio analysis stopped by user...')
+                        is_playing = False
+                        running_flag = False
+                        tmp_cfg['LIVE_STOP_FLAG'] = False
+                        cfg.set_config(tmp_cfg)
                         
                 else:
                     is_playing = False
                     if cfg.LOOPBACK:
-                        print('End of loopback analysis since there is no signal coming from input device...\n')
+                        print('End of live analysis since there is no signal coming from loopback...\n')
 
         if not cfg.NON_STOP:
             running_flag = False
-    
-    return 0

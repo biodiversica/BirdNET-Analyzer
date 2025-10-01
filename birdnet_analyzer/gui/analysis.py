@@ -63,6 +63,10 @@ def run_analysis(
     skip_existing: bool,
     save_params: bool,
     progress: gr.Progress | None,
+    real_time: bool = False,
+    loopback: bool = False,
+    non_stop: bool = False,
+    input_device: str | None = None,
 ):
     """Starts the analysis.
 
@@ -134,6 +138,10 @@ def run_analysis(
         output=output_path,
         additional_columns=additional_columns,
         use_perch=use_perch,
+        real_time=real_time,
+        loopback=loopback,
+        non_stop=non_stop,
+        input_device=input_device,
     )
 
     if species_list_choice == gu._CUSTOM_CLASSIFIER:
@@ -142,34 +150,42 @@ def run_analysis(
 
         model.reset_custom_classifier()
 
-    gu.validate(cfg.FILE_LIST, loc.localize("validation-no-audio-files-found"))
+    if real_time:
+        from birdnet_analyzer.analyze.utils import run_real_time_analysis
 
-    result_list = []
+        print("Running BirdNET-Analyzer in real-time mode...")
+        run_real_time_analysis(flist[0])
 
-    if progress is not None:
-        progress(0, desc=f"{loc.localize('progress-starting')} ...")
-
-    # Analyze files
-    if cfg.CPU_THREADS < 2:
-        result_list.extend(analyze_file_wrapper(entry) for entry in flist)
+        return 0
     else:
-        with concurrent.futures.ProcessPoolExecutor(max_workers=cfg.CPU_THREADS) as executor:
-            futures = (executor.submit(analyze_file_wrapper, arg) for arg in flist)
-            for i, f in enumerate(concurrent.futures.as_completed(futures), start=1):
-                if progress is not None:
-                    progress((i, len(flist)), total=len(flist), unit="files")
-                result = f.result()
+        gu.validate(cfg.FILE_LIST, loc.localize("validation-no-audio-files-found"))
 
-                result_list.append(result)
+        result_list = []
 
-    # Combine results?
-    if cfg.COMBINE_RESULTS:
-        combine_list = [[r[1] for r in result_list if r[0] == i[0]][0] for i in flist]
-        print(f"Combining results, writing to {cfg.OUTPUT_PATH}...", end="", flush=True)
-        combine_results(combine_list)
-        print("done!", flush=True)
+        if progress is not None:
+            progress(0, desc=f"{loc.localize('progress-starting')} ...")
 
-    if save_params:
-        save_analysis_params(os.path.join(cfg.OUTPUT_PATH, cfg.ANALYSIS_PARAMS_FILENAME))
+        # Analyze files
+        if cfg.CPU_THREADS < 2:
+            result_list.extend(analyze_file_wrapper(entry) for entry in flist)
+        else:
+            with concurrent.futures.ProcessPoolExecutor(max_workers=cfg.CPU_THREADS) as executor:
+                futures = (executor.submit(analyze_file_wrapper, arg) for arg in flist)
+                for i, f in enumerate(concurrent.futures.as_completed(futures), start=1):
+                    if progress is not None:
+                        progress((i, len(flist)), total=len(flist), unit="files")
+                    result = f.result()
 
-    return [[os.path.relpath(r[0], input_dir), bool(r[1])] for r in result_list] if input_dir else result_list[0][1]["csv"] if result_list[0][1] else None
+                    result_list.append(result)
+
+        # Combine results?
+        if cfg.COMBINE_RESULTS:
+            combine_list = [[r[1] for r in result_list if r[0] == i[0]][0] for i in flist]
+            print(f"Combining results, writing to {cfg.OUTPUT_PATH}...", end="", flush=True)
+            combine_results(combine_list)
+            print("done!", flush=True)
+
+        if save_params:
+            save_analysis_params(os.path.join(cfg.OUTPUT_PATH, cfg.ANALYSIS_PARAMS_FILENAME))
+
+        return [[os.path.relpath(r[0], input_dir), bool(r[1])] for r in result_list] if input_dir else result_list[0][1]["csv"] if result_list[0][1] else None
