@@ -62,7 +62,7 @@ def analyze(
         use_perch (bool, optional): Whether to use the Perch model for analysis. Defaults to False.
         real_time (bool, optional): Whether to use real-time audio analysis from soundcard input. Defaults to False.
         loopback (bool, optional): Whether to use real-time audio analysis from speaker loopback as input (real_time must be True). Defaults to False.
-        non_stop (bool, optional): Whether to use the Perch model for analysis. Defaults to False.
+        non_stop (bool, optional):  Keep running the real-time analysis even if there is no signal coming from input_device. Defaults to False.
         input_device (str, optional): Input device used in real-time audio analysis. Defaults to None (default input sound device which is set in your operating system).
     Returns:
         None
@@ -112,7 +112,7 @@ def analyze(
     )
 
     if real_time:
-        from birdnet_analyzer.analyze.utils import run_real_time_analysis
+        from birdnet_analyzer.analyze.utils import analyze_real_time
 
         print("Running BirdNET-Analyzer in real-time mode...")
 
@@ -121,7 +121,7 @@ def analyze(
         else:
             print(f"Species list contains {len(cfg.SPECIES_LIST)} species")
 
-        run_real_time_analysis(flist[0])        
+        analyze_real_time(flist[0])        
 
     else:
         print(f"Found {len(cfg.FILE_LIST)} files to analyze")

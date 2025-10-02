@@ -793,9 +793,9 @@ def create_table_line(table_width, line_type):
         new_line = new_line + line_type
     return new_line
 
-def run_real_time_analysis(item):
+def analyze_real_time(item):
     """
-    Analyzes real-time audio from input device in chunks of 3 seconds.
+    Analyzes real-time audio from input device in chunks of cfg.SIG_LENGTH seconds.
 
     Args:
         item (tuple): A tuple containing the file path (str) and configuration settings.
@@ -807,22 +807,24 @@ def run_real_time_analysis(item):
     # get only configuration settings
     cfg.set_config(item[1])
 
-    # check if real-time log live is empty and write header
-    LIVELOG_HEADER = "Date Time,Scientific name,Common name,Confidence\n"
-    if os.path.getsize(cfg.LIVE_LOG_FILE) == 0:
-        with open(cfg.LIVE_LOG_FILE, "a") as livelog:
-            livelog.write(LIVELOG_HEADER)
-
     # table size of printed results
     table_width = 100
     column_width = 25
 
     # maybe future args...
     date_time = False
-    running_flag = True
     buffer_size = 1024
+    real_time_log_flag = False
+
+    if real_time_log_flag:
+        # check if real-time log live is empty and write header
+        REAL_TIME_LOG_HEADER = "Date Time,Scientific name,Common name,Confidence\n"
+        if os.path.getsize(cfg.REAL_TIME_LOG_FILE) == 0:
+            with open(cfg.REAL_TIME_LOG_FILE, "a") as rt_log:
+                rt_log.write(REAL_TIME_LOG_HEADER)
 
     # main rec/analyze audio loop
+    running_flag = True
     while running_flag:
         # Init start-end time
         # start_time = datetime.datetime.now()
@@ -848,7 +850,7 @@ def run_real_time_analysis(item):
                 if np.mean(tmp_data[:,0]) != 0:
                     is_playing = True
                     if cfg.LOOPBACK:
-                        print('\n\nStarting live analysis since there is signal coming from loopback...')
+                        print('\n\nStarting real-time analysis since there is signal coming from loopback...')
                     
                     # Print table header on terminal
                     print(create_table_line(table_width,'='))
@@ -908,6 +910,7 @@ def run_real_time_analysis(item):
                     sci_name = lbl.split('_', 1)[0]
                     com_name = lbl.split('_', 1)[-1]
                     
+                    tmp_cfg = cfg.get_config()
                     # Print result if confidence is above minimum and if species is within location range
                     if cfd > cfg.MIN_CONFIDENCE and (not cfg.SPECIES_LIST or species_label in cfg.SPECIES_LIST):
                         # Get current date-time
@@ -926,22 +929,28 @@ def run_real_time_analysis(item):
                                   )
                         print(create_table_line(table_width,'-'))
 
-                        with open(cfg.LIVE_LOG_FILE, "a") as livelog:
-                            livelog.write(f'{tmp_date.strftime("%Y-%m-%d %H:%M:%S")},{sci_name},{com_name},{cfd}\n')
+                        # write data to log file
+                        if real_time_log_flag:
+                            with open(cfg.REAL_TIME_LOG_FILE, "a") as rt_log:
+                                rt_log.write(f'{tmp_date.strftime("%Y-%m-%d %H:%M:%S")},{sci_name},{com_name},{cfd}\n')
+                        
+                        # write data to GUI dataframe
+                        tmp_cfg['REAL_TIME_OUTPUT_DATA'].append([start,end,sci_name,com_name,cfd])
 
                     # check if user stopped live audio analysis when using the GUI
-                    tmp_cfg = cfg.get_config()
-                    if tmp_cfg['LIVE_STOP_FLAG']:
-                        print('Live audio analysis stopped by user...')
+                    if tmp_cfg['REAL_TIME_STOP_FLAG']:
+                        print('Real-time analysis stopped by the user...')
                         is_playing = False
                         running_flag = False
-                        tmp_cfg['LIVE_STOP_FLAG'] = False
-                        cfg.set_config(tmp_cfg)
+                        tmp_cfg['REAL_TIME_STOP_FLAG'] = False
+                    cfg.set_config(tmp_cfg)
                         
                 else:
                     is_playing = False
                     if cfg.LOOPBACK:
-                        print('End of live analysis since there is no signal coming from loopback...\n')
+                        print('Pausing real-time analysis since there is no signal coming from loopback...\n')
+
 
         if not cfg.NON_STOP:
             running_flag = False
+            print('End of real-time analysis since there is no signal from input device...')

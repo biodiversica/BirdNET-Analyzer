@@ -96,6 +96,10 @@ def run_analysis(
         threads: The number of threads to be used.
         input_dir: The input directory.
         progress: The gradio progress bar.
+        real_time (bool, optional): Whether to use real-time audio analysis from soundcard input. Defaults to False.
+        loopback (bool, optional): Whether to use real-time audio analysis from speaker loopback as input (real_time must be True). Defaults to False.
+        non_stop (bool, optional): Keep running the real-time analysis even if there is no signal coming from input_device. Defaults to False.
+        input_device (str, optional): Input device used in real-time audio analysis. Defaults to None (default input sound device which is set in your operating system).
     """
     import birdnet_analyzer.gui.localization as loc
 
@@ -151,10 +155,14 @@ def run_analysis(
         model.reset_custom_classifier()
 
     if real_time:
-        from birdnet_analyzer.analyze.utils import run_real_time_analysis
+        from birdnet_analyzer.analyze.utils import analyze_real_time
 
         print("Running BirdNET-Analyzer in real-time mode...")
-        run_real_time_analysis(flist[0])
+
+        # raise start flag to update start button on GUI
+        flist[0][1]['REAL_TIME_START_FLAG'] = True
+        
+        analyze_real_time(flist[0])
 
         return 0
     else:

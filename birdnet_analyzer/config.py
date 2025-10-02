@@ -253,8 +253,10 @@ REAL_TIME: bool = False
 LOOPBACK: bool = False
 NON_STOP: bool = False
 INPUT_DEVICE: str | None = None
-LIVE_LOG_FILE: str = os.path.join(SCRIPT_DIR, "BirdNET_live_log.csv")
-LIVE_STOP_FLAG: bool = False
+REAL_TIME_LOG_FILE: str = os.path.join(SCRIPT_DIR, "BirdNET_real_time_log.csv")
+REAL_TIME_START_FLAG: bool = False
+REAL_TIME_STOP_FLAG: bool = False
+REAL_TIME_OUTPUT_DATA = []
 
 ######################
 # Get and set config #
