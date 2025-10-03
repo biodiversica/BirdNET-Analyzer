@@ -804,6 +804,9 @@ def analyze_real_time(item):
     # import soundcard lib to handle input device signal
     import soundcard as sc
 
+    # import platform for specific soundcard settings
+    from sys import platform
+
     # get only configuration settings
     cfg.set_config(item[1])
 
@@ -840,9 +843,17 @@ def analyze_real_time(item):
             else:
                 mic_id = str(sc.default_microphone().name)
 
+        # set channel configuration for different operating system
+        if platform == "linux" or platform == "linux2":
+            channels = [-1,0,1]
+        else:
+            channels = [0,1]
+
+        # compute recording sample block length
+        block_size = int(cfg.SAMPLE_RATE*cfg.SIG_LENGTH)
+
         is_playing = False
-        # TODO: set channel configuration for different operating system
-        with sc.get_microphone(id=mic_id, include_loopback=cfg.LOOPBACK).recorder(samplerate=cfg.SAMPLE_RATE,channels=[-1,0,1]) as mic:
+        with sc.get_microphone(id=mic_id, include_loopback=cfg.LOOPBACK).recorder(samplerate=cfg.SAMPLE_RATE,channels=channels) as mic:
             # Check if there is signal through the input device
             while not is_playing:
                 # Record an initial audio buffer and check if all samples are not zero
@@ -859,16 +870,21 @@ def analyze_real_time(item):
                           adjust_to_column_width('Common',column_width) + ' | ' +
                           adjust_to_column_width('Confidence',column_width)
                           )
-                    print(create_table_line(table_width,'='))
+                    print(create_table_line(table_width,'=')) 
 
             # Start recording and analyzing chunks of audio
             while is_playing:
+
                 # Record data from input channel 
-                data = mic.record(numframes=int(cfg.SAMPLE_RATE*cfg.SIG_LENGTH)) 
+                data = mic.record(numframes=block_size) 
                 
-                # TODO: check channel mix implementation in different operating systems
-                # only get stereo mix result from recorded signal (linux -> first index [stereo mix, left, right])
-                chunk = data[:,0]
+                # channel mix implementation in different operating systems
+                if platform == "linux" or platform == "linux2":
+                    # linux already computes a mean between left and right inputs (index = 0, stereo mix)
+                    chunk = data[:,0]
+                else:
+                    # compute mean signal among all input channels
+                    chunk = np.mean(data[:,:],axis=1)
 
                 # Check if loopback has not stop yet
                 if np.mean(chunk) != 0:

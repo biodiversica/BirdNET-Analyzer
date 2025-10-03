@@ -139,7 +139,7 @@
     "inference-settings-use-top-n-checkbox-info": "Picks the top N species sorted by confidence score.",
     "inference-settings-use-top-n-checkbox-label": "Use top N species",
     "real-time-tab-title": "Real-time analysis",
-    "real-time-tab-loopback-checkbox-info": "The real-time mode analyzes the signal from the input sound device that is set in the operating system. The checkbox below allows the analysis of the audio signal that is reproduced through the output sound device that is set in the operating system:",
+    "real-time-tab-loopback-checkbox-info": "The real-time mode analyzes the signal from the input sound device that is set in the operating system. The Loopback checkbox provides the analysis of the audio signal reproduced through the output sound device that is set in the operating system:",
     "real-time-tab-loopback-checkbox-label": "Loopback",
     "real-time-tab-start-button-label": "Start analysis",
     "real-time-tab-stop-button-label": "Stop analysis",
