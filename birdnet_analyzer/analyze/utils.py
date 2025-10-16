@@ -856,6 +856,15 @@ def analyze_real_time(item):
         with sc.get_microphone(id=mic_id, include_loopback=cfg.LOOPBACK).recorder(samplerate=cfg.SAMPLE_RATE,channels=channels) as mic:
             # Check if there is signal through the input device
             while not is_playing:
+                # check if user stopped live audio analysis when using the GUI
+                tmp_cfg = cfg.get_config()
+                if tmp_cfg['REAL_TIME_STOP_FLAG']:
+                    print('Real-time analysis stopped by the user...')
+                    running_flag = False
+                    tmp_cfg['REAL_TIME_STOP_FLAG'] = False
+                    cfg.set_config(tmp_cfg)
+                    break
+
                 # Record an initial audio buffer and check if all samples are not zero
                 tmp_data = mic.record(numframes=buffer_size)
                 if np.mean(tmp_data[:,0]) != 0:
@@ -965,8 +974,9 @@ def analyze_real_time(item):
                     is_playing = False
                     if cfg.LOOPBACK:
                         print('Pausing real-time analysis since there is no signal coming from loopback...\n')
+                  
 
-
-        if not cfg.NON_STOP:
-            running_flag = False
-            print('End of real-time analysis since there is no signal from input device...')
+        # check if nonstop option is deactivated and stop analysis when there is no input signal
+        # if not cfg.NON_STOP:
+        #     running_flag = False
+        #     print('End of real-time analysis since there is no signal from input device...')

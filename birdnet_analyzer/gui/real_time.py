@@ -138,7 +138,7 @@ def build_real_time_analysis_tab():
             clear_rt_button = gr.Button(loc.localize("real-time-tab-clear-button-label"), variant="huggingface", interactive=True)
 
         # real-time analysis results dataframe
-        REAL_TIME_OUTPUT_DATAframe = gr.Dataframe(
+        REAL_TIME_OUTPUT_DATAFRAME = gr.Dataframe(
             type="pandas",
             headers=[
                 loc.localize("single-tab-output-header-start"),
@@ -159,13 +159,13 @@ def build_real_time_analysis_tab():
             )
             if file_path:
                 df.to_csv(file_path, index=False)
-        save_rt_button.click(save_dataframe_with_dialog, inputs=REAL_TIME_OUTPUT_DATAframe)
-        def clear_REAL_TIME_OUTPUT_DATAframe():
+        save_rt_button.click(save_dataframe_with_dialog, inputs=REAL_TIME_OUTPUT_DATAFRAME)
+        def clear_REAL_TIME_OUTPUT_DATAFRAME():
             tmp_cfg = cfg.get_config()
             tmp_cfg['REAL_TIME_OUTPUT_DATA'] = []
             cfg.set_config(tmp_cfg)
             return []
-        clear_rt_button.click(clear_REAL_TIME_OUTPUT_DATAframe,outputs=REAL_TIME_OUTPUT_DATAframe)
+        clear_rt_button.click(clear_REAL_TIME_OUTPUT_DATAFRAME,outputs=REAL_TIME_OUTPUT_DATAFRAME)
 
         output_update_timer = gr.Timer(TIMER_TICK_INTERVAL)
         def get_rt_output():
@@ -174,7 +174,7 @@ def build_real_time_analysis_tab():
                 return tmp_cfg['REAL_TIME_OUTPUT_DATA'],gr.update(value=loc.localize("real-time-tab-running-label"), interactive=False), gr.update(value=loc.localize("real-time-tab-stop-button-label"), interactive=True)
             else:
                 return tmp_cfg['REAL_TIME_OUTPUT_DATA'],gr.update(value=loc.localize("real-time-tab-start-button-label"), interactive=True), gr.update(value=loc.localize("real-time-tab-stop-button-label"), interactive=False)
-        output_update_timer.tick(get_rt_output,outputs=[REAL_TIME_OUTPUT_DATAframe,start_rt_button,stop_rt_button])
+        output_update_timer.tick(get_rt_output,outputs=[REAL_TIME_OUTPUT_DATAFRAME,start_rt_button,stop_rt_button])
 
 if __name__ == "__main__":
     gu.open_window(build_real_time_analysis_tab)
